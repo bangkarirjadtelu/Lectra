@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
+import { CustomSelect } from './ui/CustomSelect';
 import { RealisasiService } from '../services/realisasiService';
 import { exportRealisasiExcel } from '../utils/exportRealisasi';
 import { formatRupiah } from '../data/mockData';
@@ -21,6 +22,7 @@ interface Props {
 
 export function ExportRealisasiModal({ open, onClose, year, alokasiList, dosenList, initialJenis, onDone }: Props) {
   const [jenis, setJenis] = useState<Jenis>(initialJenis);
+  const [fakultas, setFakultas] = useState<string>('SEMUA');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -29,20 +31,34 @@ export function ExportRealisasiModal({ open, onClose, year, alokasiList, dosenLi
   useEffect(() => {
     if (open) {
       setJenis(initialJenis);
+      setFakultas('SEMUA');
       setSearch('');
       setSelected(new Set(alokasiList.map(a => a.id)));
     }
   }, [open]);
 
+  // Daftar opsi fakultas yang tersedia dari data dosen
+  const fakultasOptions = useMemo(() => {
+    const set = new Set<string>();
+    alokasiList.forEach(a => {
+      const d = dosenList.find(x => x.id === a.dosenId);
+      if (d?.fakultas && d.fakultas.trim()) {
+        set.add(d.fakultas.trim());
+      }
+    });
+    return ['SEMUA', ...Array.from(set).sort()];
+  }, [alokasiList, dosenList]);
+
   const rows = useMemo(() => alokasiList
     .map(a => ({ a, d: dosenList.find(x => x.id === a.dosenId) }))
     .filter((r): r is { a: Alokasi; d: Dosen } => !!r.d)
     .filter(r => jenis === 'SEMUA' || r.a.jenis === jenis)
+    .filter(r => fakultas === 'SEMUA' || r.d.fakultas === fakultas)
     .filter(r => {
       const s = search.trim().toLowerCase();
-      return !s || r.d.nama.toLowerCase().includes(s) || r.d.nip.includes(s);
+      return !s || r.d.nama.toLowerCase().includes(s) || r.d.nip.includes(s) || (r.d.fakultas && r.d.fakultas.toLowerCase().includes(s));
     })
-    .sort((x, y) => x.d.nama.localeCompare(y.d.nama)), [alokasiList, dosenList, jenis, search]);
+    .sort((x, y) => x.d.nama.localeCompare(y.d.nama)), [alokasiList, dosenList, jenis, fakultas, search]);
 
   const allVisibleSelected = rows.length > 0 && rows.every(r => selected.has(r.a.id));
   const selectedCount = alokasiList.filter(a => selected.has(a.id)).length;
@@ -107,11 +123,27 @@ export function ExportRealisasiModal({ open, onClose, year, alokasiList, dosenLi
         </div>
       }
     >
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-xs font-semibold text-[#344054] mr-1">Jenis:</span>
-        {chip('SEMUA', 'Semua')}
-        {chip('OPEX', 'OPEX')}
-        {chip('CAPEX', 'CAPEX')}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 mb-3">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <span className="text-xs font-semibold text-[#344054] mr-1">Jenis:</span>
+          {chip('SEMUA', 'Semua')}
+          {chip('OPEX', 'OPEX')}
+          {chip('CAPEX', 'CAPEX')}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-[#344054]">Fakultas:</span>
+          <CustomSelect
+            value={fakultas}
+            onChange={(val) => setFakultas(String(val))}
+            options={fakultasOptions.map(f => ({
+              label: f === 'SEMUA' ? 'Semua Fakultas' : f,
+              value: f
+            }))}
+            className="w-auto"
+            buttonClassName="bg-white border border-[#E4E7EC] rounded-lg px-2.5 py-1 text-xs font-medium text-[#1F2937] hover:bg-gray-50 h-[30px]"
+            dropdownClassName="w-auto min-w-[140px] right-0"
+          />
+        </div>
       </div>
       <input
         type="text"
