@@ -27,6 +27,11 @@ const navItems: { label: string; page: Page; icon: React.ReactNode }[] = [
     label: 'Progress JAD',
     page: 'progress-jad',
     icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0012 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75z" /></svg>
+  },
+  {
+    label: 'Laporan',
+    page: 'laporan' as Page,
+    icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
   }
 ];
 
@@ -35,7 +40,7 @@ export function TopNavigation({ currentPage, onNavigate, onLogout }: TopNavigati
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <header className="bg-white border-b border-[#E4E7EC] sticky top-0 z-40">
+    <header className="bg-white border-b border-[#E4E7EC] sticky top-0 z-40 print:hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-6">
         {/* Logo */}
         <div className="flex items-center gap-2.5 shrink-0">

@@ -7,6 +7,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { PenetapanAnggaranPage } from './pages/PenetapanAnggaranPage';
 import { RealisasiAnggaranPage } from './pages/RealisasiAnggaranPage';
 import { ProgressJADPage } from './pages/ProgressJADPage';
+import { LaporanPage } from './pages/LaporanPage';
 import { DosenDashboard } from './pages/DosenDashboard';
 import { AuthService } from './services/authService';
 import { ChatBot } from './components/ui/ChatBot';
@@ -121,6 +122,7 @@ export default function App() {
       {page === 'penetapan' && <PenetapanAnggaranPage />}
       {page === 'realisasi' && <RealisasiAnggaranPage />}
       {page === 'progress-jad' && <ProgressJADPage />}
+      {page === 'laporan' && <LaporanPage />}
       {isAuthed && <ChatBot />}
     </div>
   );

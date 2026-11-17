@@ -1,6 +1,6 @@
 export type BudgetType = 'OPEX' | 'CAPEX';
 export type BudgetStatus = 'NORMAL' | 'NEAR_LIMIT' | 'OVER_BUDGET';
-export type Page = 'login' | 'public' | 'dashboard' | 'penetapan' | 'realisasi' | 'dosen' | 'progress-jad';
+export type Page = 'login' | 'public' | 'dashboard' | 'penetapan' | 'realisasi' | 'dosen' | 'progress-jad' | 'laporan';
 
 export interface Dosen {
   id: string;
