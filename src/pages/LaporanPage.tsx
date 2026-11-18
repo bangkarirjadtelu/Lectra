@@ -86,6 +86,9 @@ export function LaporanPage() {
   // Search
   const [search, setSearch] = useState('');
 
+  // Sort tahun
+  const [sortTahun, setSortTahun] = useState<'asc' | 'desc'>('asc');
+
   const fetchData = useCallback(async () => {
     if (tahunDari > tahunSampai) {
       setError('Tahun Dari tidak boleh lebih besar dari Tahun Sampai.');
@@ -111,15 +114,22 @@ export function LaporanPage() {
   }, [tahunDari, tahunSampai, jenis, fakultas]);
 
   const filteredRows = useMemo(() => {
-    if (!search) return rows;
-    const q = search.toLowerCase();
-    return rows.filter(
-      (r) =>
-        r.nama.toLowerCase().includes(q) ||
-        r.nip.includes(q) ||
-        r.fakultas.toLowerCase().includes(q)
-    );
-  }, [rows, search]);
+    let result = rows;
+    if (search) {
+      const q = search.toLowerCase();
+      result = rows.filter(
+        (r) =>
+          r.nama.toLowerCase().includes(q) ||
+          r.nip.includes(q) ||
+          r.fakultas.toLowerCase().includes(q)
+      );
+    }
+    return [...result].sort((a, b) => {
+      const tahunCmp = sortTahun === 'asc' ? a.tahun - b.tahun : b.tahun - a.tahun;
+      if (tahunCmp !== 0) return tahunCmp;
+      return a.nama.localeCompare(b.nama, 'id');
+    });
+  }, [rows, search, sortTahun]);
 
   const summary = useMemo(() => ({
     totalAnggaran: rows.reduce((s, r) => s + r.totalAnggaran, 0),
@@ -405,7 +415,17 @@ export function LaporanPage() {
                         <th className="px-3 py-2.5 text-left font-semibold">NIP</th>
                         <th className="px-3 py-2.5 text-left font-semibold">Fak.</th>
                         <th className="px-3 py-2.5 text-left font-semibold">Program Studi</th>
-                        <th className="px-3 py-2.5 text-center font-semibold">Tahun</th>
+                        <th className="px-3 py-2.5 text-center font-semibold">
+                          <button
+                            onClick={() => setSortTahun(s => s === 'asc' ? 'desc' : 'asc')}
+                            className="inline-flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
+                          >
+                            Tahun
+                            <span className="text-white/70 text-[10px]">
+                              {sortTahun === 'asc' ? '↑' : '↓'}
+                            </span>
+                          </button>
+                        </th>
                         {showOpexCol && <th className="px-3 py-2.5 text-right font-semibold">OPEX Anggaran</th>}
                         {showCapexCol && <th className="px-3 py-2.5 text-right font-semibold">CAPEX Anggaran</th>}
                         <th className="px-3 py-2.5 text-right font-semibold">Total Anggaran</th>
