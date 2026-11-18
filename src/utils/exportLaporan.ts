@@ -67,6 +67,7 @@ export async function exportLaporanExcel(
     { header: 'NIP', key: 'nip', width: 20 },
     { header: 'Fakultas', key: 'fakultas', width: 8 },
     { header: 'Program Studi', key: 'programStudi', width: 28 },
+    { header: 'Tahun', key: 'tahun', width: 8 },
   ];
   if (jenis !== 'CAPEX') cols.push({ header: 'OPEX Anggaran', key: 'opexAnggaran', width: 18 });
   if (jenis !== 'OPEX') cols.push({ header: 'CAPEX Anggaran', key: 'capexAnggaran', width: 18 });
@@ -98,6 +99,7 @@ export async function exportLaporanExcel(
       nip: r.nip,
       fakultas: r.fakultas,
       programStudi: r.programStudi,
+      tahun: r.tahun,
       opexAnggaran: r.opexAnggaran,
       capexAnggaran: r.capexAnggaran,
       totalAnggaran: r.totalAnggaran,
@@ -123,7 +125,7 @@ export async function exportLaporanExcel(
         cell.numFmt = '0.0%';
         cell.alignment = { horizontal: 'center' };
       }
-      if (c.key === 'no') cell.alignment = { horizontal: 'center' };
+      if (c.key === 'no' || c.key === 'tahun') cell.alignment = { horizontal: 'center' };
     });
   });
 
@@ -134,6 +136,7 @@ export async function exportLaporanExcel(
     nip: '',
     fakultas: '',
     programStudi: '',
+    tahun: '',
     opexAnggaran: rows.reduce((s, r) => s + r.opexAnggaran, 0),
     capexAnggaran: rows.reduce((s, r) => s + r.capexAnggaran, 0),
     totalAnggaran: rows.reduce((s, r) => s + r.totalAnggaran, 0),
