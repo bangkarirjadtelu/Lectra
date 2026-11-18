@@ -1,16 +1,17 @@
 -- 31_laporan_rpc.sql
--- RPC untuk halaman Laporan: menghitung total anggaran & realisasi per dosen
--- Menggunakan SECURITY DEFINER agar bisa join realisasi_anggaran meskipun RLS ketat
+-- RPC untuk halaman Laporan: data anggaran & realisasi PER DOSEN PER TAHUN
+-- SECURITY DEFINER agar bisa join realisasi_anggaran meskipun RLS ketat
 
 DROP FUNCTION IF EXISTS public.get_laporan_dosen_rows(SMALLINT, SMALLINT, TEXT, TEXT);
 
 CREATE OR REPLACE FUNCTION public.get_laporan_dosen_rows(
-  p_tahun_dari  SMALLINT,
+  p_tahun_dari   SMALLINT,
   p_tahun_sampai SMALLINT,
-  p_jenis       TEXT DEFAULT 'SEMUA',   -- 'SEMUA' | 'OPEX' | 'CAPEX'
-  p_fakultas    TEXT DEFAULT 'SEMUA'    -- 'SEMUA' atau kode fakultas
+  p_jenis        TEXT DEFAULT 'SEMUA',
+  p_fakultas     TEXT DEFAULT 'SEMUA'
 )
 RETURNS TABLE (
+  tahun           SMALLINT,
   dosen_id        UUID,
   nama            TEXT,
   nip             TEXT,
@@ -30,11 +31,12 @@ AS $$
 BEGIN
   RETURN QUERY
   SELECT
+    a.tahun,
     d.id                                                                AS dosen_id,
-    d.nama                                                              AS nama,
-    d.nip                                                               AS nip,
-    d.fakultas                                                          AS fakultas,
-    d.program_studi                                                     AS program_studi,
+    d.nama,
+    d.nip,
+    d.fakultas,
+    d.program_studi,
     COALESCE(SUM(CASE WHEN a.jenis_anggaran = 'OPEX'  THEN a.nominal_anggaran ELSE 0 END), 0)::BIGINT AS opex_anggaran,
     COALESCE(SUM(CASE WHEN a.jenis_anggaran = 'CAPEX' THEN a.nominal_anggaran ELSE 0 END), 0)::BIGINT AS capex_anggaran,
     COALESCE(SUM(CASE WHEN a.jenis_anggaran = 'OPEX'  THEN r_agg.total_real   ELSE 0 END), 0)::BIGINT AS opex_realisasi,
@@ -51,9 +53,9 @@ BEGIN
   WHERE a.tahun >= p_tahun_dari
     AND a.tahun <= p_tahun_sampai
     AND (p_fakultas = 'SEMUA' OR d.fakultas = p_fakultas)
-    AND (p_jenis = 'SEMUA' OR a.jenis_anggaran = p_jenis)
-  GROUP BY d.id, d.nama, d.nip, d.fakultas, d.program_studi
-  ORDER BY d.nama;
+    AND (p_jenis    = 'SEMUA' OR a.jenis_anggaran = p_jenis)
+  GROUP BY a.tahun, d.id, d.nama, d.nip, d.fakultas, d.program_studi
+  ORDER BY d.nama, a.tahun;
 END;
 $$;
 

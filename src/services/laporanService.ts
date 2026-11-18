@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 
 export interface LaporanDosenRow {
+  tahun: number;
   dosenId: string;
   nama: string;
   nip: string;
@@ -46,6 +47,7 @@ export const LaporanService = {
     if (!data) return [];
 
     return (data as any[]).map((r) => ({
+      tahun: r.tahun,
       dosenId: r.dosen_id,
       nama: r.nama,
       nip: r.nip,

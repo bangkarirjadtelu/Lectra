@@ -364,7 +364,7 @@ export function LaporanPage() {
                 </div>
               </div>
               <span className="text-xs text-[#98A2B3]">
-                {filteredRows.length} dosen
+                {filteredRows.length} baris
               </span>
               <button
                 onClick={handleExportExcel}
@@ -405,6 +405,7 @@ export function LaporanPage() {
                         <th className="px-3 py-2.5 text-left font-semibold">NIP</th>
                         <th className="px-3 py-2.5 text-left font-semibold">Fak.</th>
                         <th className="px-3 py-2.5 text-left font-semibold">Program Studi</th>
+                        <th className="px-3 py-2.5 text-center font-semibold">Tahun</th>
                         {showOpexCol && <th className="px-3 py-2.5 text-right font-semibold">OPEX Anggaran</th>}
                         {showCapexCol && <th className="px-3 py-2.5 text-right font-semibold">CAPEX Anggaran</th>}
                         <th className="px-3 py-2.5 text-right font-semibold">Total Anggaran</th>
@@ -417,7 +418,7 @@ export function LaporanPage() {
                         const serapan = r.totalAnggaran > 0 ? (r.totalRealisasi / r.totalAnggaran) * 100 : 0;
                         return (
                           <tr
-                            key={r.dosenId}
+                            key={`${r.dosenId}-${r.tahun}`}
                             className={`border-t border-[#EAECF0] ${idx % 2 === 1 ? 'bg-[#F9FAFB]' : 'bg-white'} hover:bg-[#F8E9ED]/40 transition-colors`}
                           >
                             <td className="px-3 py-2 text-[#98A2B3] text-center">{idx + 1}</td>
@@ -429,6 +430,11 @@ export function LaporanPage() {
                               </span>
                             </td>
                             <td className="px-3 py-2 text-[#667085]">{r.programStudi}</td>
+                            <td className="px-3 py-2 text-center">
+                              <span className="inline-block px-2 py-0.5 rounded-[5px] text-xs font-semibold bg-[#E8F5EF] text-[#16805B]">
+                                {r.tahun}
+                              </span>
+                            </td>
                             {showOpexCol && <td className="px-3 py-2 text-right text-[#1F2937]">{formatRupiah(r.opexAnggaran)}</td>}
                             {showCapexCol && <td className="px-3 py-2 text-right text-[#1F2937]">{formatRupiah(r.capexAnggaran)}</td>}
                             <td className="px-3 py-2 text-right font-medium text-[#1F2937]">{formatRupiah(r.totalAnggaran)}</td>
@@ -442,8 +448,8 @@ export function LaporanPage() {
                     </tbody>
                     <tfoot>
                       <tr className="bg-[#F8E9ED] border-t-2 border-[#8F2438]">
-                        <td className="px-3 py-2.5" colSpan={5}>
-                          <span className="font-bold text-[#8F2438] text-xs">TOTAL ({filteredRows.length} dosen)</span>
+                        <td className="px-3 py-2.5" colSpan={6}>
+                          <span className="font-bold text-[#8F2438] text-xs">TOTAL ({filteredRows.length} baris)</span>
                         </td>
                         {showOpexCol && (
                           <td className="px-3 py-2.5 text-right font-bold text-[#1F2937]">{formatRupiah(totals.opexAnggaran)}</td>
