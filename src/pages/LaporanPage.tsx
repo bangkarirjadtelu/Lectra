@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import { LaporanService, type LaporanDosenRow } from '../services/laporanService';
 import { exportLaporanExcel } from '../utils/exportLaporan';
@@ -167,7 +167,14 @@ export function LaporanPage() {
     }
   };
 
-  const handleExportPdf = () => window.print();
+  const handleExportPdf = () => {
+    const originalTitle = document.title;
+    document.title = 'Laporan Anggaran'; // Hilangkan nama aplikasi di header cetak PDF
+    window.print();
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 1000);
+  };
 
   const fkLabel = appliedFilter.fakultas === 'SEMUA' ? 'Semua Fakultas' : appliedFilter.fakultas;
   const tahunLabel =
@@ -181,15 +188,25 @@ export function LaporanPage() {
   return (
     <>
       {/* Print-only header */}
-      <div className="hidden print:block mb-6">
-        <h1 className="text-xl font-bold text-[#1F2937]">Laporan Anggaran Dosen</h1>
-        <p className="text-sm text-[#667085]">
-          Fakultas: {fkLabel} &nbsp;|&nbsp; Tahun: {tahunLabel} &nbsp;|&nbsp; Jenis: {appliedFilter.jenis}
-        </p>
-        <p className="text-xs text-[#98A2B3]">
-          Dicetak: {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}
-        </p>
-        <hr className="my-3 border-[#E4E7EC]" />
+      <div className="hidden print:block mb-4 pb-3 border-b-2 border-[#8F2438]">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-bold text-[#1F2937] tracking-tight">
+              LAPORAN ALOKASI ANGGARAN DOSEN
+            </h1>
+            <p className="text-xs text-[#667085] mt-0.5">
+              Fakultas: <span className="font-semibold text-[#1F2937]">{fkLabel}</span> &nbsp;|&nbsp;
+              Periode: <span className="font-semibold text-[#1F2937]">{tahunLabel}</span> &nbsp;|&nbsp;
+              Jenis: <span className="font-semibold text-[#1F2937]">{appliedFilter.jenis}</span>
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] text-[#98A2B3]">Tanggal Cetak:</p>
+            <p className="text-xs font-medium text-[#1F2937]">
+              {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5">
@@ -326,19 +343,29 @@ export function LaporanPage() {
               <SummaryCard label="Total CAPEX" value={summary.totalCapex} />
             </div>
 
-            {/* Chart: Jumlah Dosen Penerima per Tahun */}
+            {/* Chart: Tren Jumlah Dosen Penerima per Tahun (Grafik Garis Area dengan Gradasi) */}
             {chartData.length > 0 && (
               <div className="bg-white rounded-[16px] border border-[#E4E7EC] shadow-sm p-4 mb-4 print:mb-3">
                 <div className="mb-3">
                   <h2 className="text-sm font-semibold text-[#1F2937]">
-                    Jumlah Dosen Penerima Anggaran per Tahun — {fkLabel}
+                    Tren Jumlah Dosen Penerima Anggaran — {fkLabel}
                   </h2>
                   <p className="text-xs text-[#98A2B3] mt-0.5">
-                    Perbandingan jumlah dosen penerima OPEX vs CAPEX ({tahunLabel})
+                    Pergerakan jumlah dosen penerima OPEX dan CAPEX per tahun ({tahunLabel})
                   </p>
                 </div>
-                <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={chartData} margin={{ top: 10, right: 20, left: -10, bottom: 5 }}>
+                <ResponsiveContainer width="100%" height={230}>
+                  <AreaChart data={chartData} margin={{ top: 10, right: 20, left: -10, bottom: 5 }}>
+                    <defs>
+                      <linearGradient id="gradOpex" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COLOR_PRIMARY} stopOpacity={0.4} />
+                        <stop offset="95%" stopColor={COLOR_PRIMARY} stopOpacity={0.0} />
+                      </linearGradient>
+                      <linearGradient id="gradCapex" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={CHART_COLOR_CAPEX} stopOpacity={0.4} />
+                        <stop offset="95%" stopColor={CHART_COLOR_CAPEX} stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke={COLOR_BORDER} />
                     <XAxis dataKey="tahun" tick={{ fontSize: 11, fill: COLOR_TEXT_SECONDARY }} />
                     <YAxis
@@ -349,24 +376,32 @@ export function LaporanPage() {
                     <Tooltip content={<CustomTooltipChart />} />
                     <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
                     {appliedFilter.jenis !== 'CAPEX' && (
-                      <Bar
+                      <Area
+                        type="monotone"
                         dataKey="opexDosen"
                         name="Dosen OPEX"
-                        fill={COLOR_PRIMARY}
-                        radius={[4, 4, 0, 0]}
-                        maxBarSize={44}
+                        stroke={COLOR_PRIMARY}
+                        strokeWidth={2.5}
+                        fillOpacity={1}
+                        fill="url(#gradOpex)"
+                        dot={{ r: 4, fill: COLOR_PRIMARY, strokeWidth: 1.5, stroke: '#FFFFFF' }}
+                        activeDot={{ r: 6 }}
                       />
                     )}
                     {appliedFilter.jenis !== 'OPEX' && (
-                      <Bar
+                      <Area
+                        type="monotone"
                         dataKey="capexDosen"
                         name="Dosen CAPEX"
-                        fill={CHART_COLOR_CAPEX}
-                        radius={[4, 4, 0, 0]}
-                        maxBarSize={44}
+                        stroke={CHART_COLOR_CAPEX}
+                        strokeWidth={2.5}
+                        fillOpacity={1}
+                        fill="url(#gradCapex)"
+                        dot={{ r: 4, fill: CHART_COLOR_CAPEX, strokeWidth: 1.5, stroke: '#FFFFFF' }}
+                        activeDot={{ r: 6 }}
                       />
                     )}
-                  </BarChart>
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
             )}
@@ -493,11 +528,55 @@ export function LaporanPage() {
       {/* Print styles */}
       <style>{`
         @media print {
-          header, nav, .print\\:hidden { display: none !important; }
-          body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          @page { margin: 1.5cm; size: A4 landscape; }
-          table { font-size: 10px !important; }
-          th, td { padding: 4px 6px !important; }
+          @page {
+            margin: 0.8cm 1cm;
+            size: A4 landscape;
+          }
+          header, nav, footer, .print\\:hidden, [class*="fixed"], [class*="z-50"] {
+            display: none !important;
+          }
+          body {
+            background: white !important;
+            color: #1F2937 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .bg-white {
+            box-shadow: none !important;
+          }
+          /* Summary cards grid in print */
+          .grid {
+            display: grid !important;
+            grid-template-columns: repeat(4, 1fr) !important;
+            gap: 8px !important;
+          }
+          /* Table print styling */
+          table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            font-size: 9px !important;
+            page-break-inside: auto;
+          }
+          thead {
+            display: table-header-group !important;
+          }
+          tr {
+            page-break-inside: avoid !important;
+            page-break-after: auto !important;
+          }
+          th, td {
+            padding: 4px 6px !important;
+            border-bottom: 1px solid #EAECF0 !important;
+          }
+          th {
+            background-color: #8F2438 !important;
+            color: white !important;
+            -webkit-print-color-adjust: exact !important;
+          }
+          tfoot tr {
+            background-color: #F8E9ED !important;
+            -webkit-print-color-adjust: exact !important;
+          }
         }
       `}</style>
     </>

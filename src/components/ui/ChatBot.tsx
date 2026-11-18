@@ -79,7 +79,7 @@ export function ChatBot() {
       {/* Floating Button */}
       <button
         onClick={() => setIsOpen(true)}
-        className={`fixed bottom-6 right-6 w-14 h-14 bg-[#8F2438] text-white rounded-full flex items-center justify-center shadow-lg hover:bg-[#7a1c2d] hover:scale-105 transition-all z-50 ${isOpen ? 'scale-0 opacity-0 pointer-events-none' : 'scale-100 opacity-100'}`}
+        className={`fixed bottom-6 right-6 w-14 h-14 bg-[#8F2438] text-white rounded-full flex items-center justify-center shadow-lg hover:bg-[#7a1c2d] hover:scale-105 transition-all z-50 print:hidden ${isOpen ? 'scale-0 opacity-0 pointer-events-none' : 'scale-100 opacity-100'}`}
       >
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 16.25V18a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18V6.25A2.25 2.25 0 015.25 4h13.5A2.25 2.25 0 0121 6.25v10z" />
@@ -87,7 +87,7 @@ export function ChatBot() {
       </button>
 
       {/* Chat Window */}
-      <div className={`fixed bottom-6 right-6 w-full max-w-sm sm:w-[350px] bg-white transition-colors rounded-[20px] shadow-2xl border border-[#E4E7EC] flex flex-col z-50 overflow-hidden transition-all duration-300 origin-bottom-right ${isOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0 pointer-events-none'}`} style={{ height: '500px', maxHeight: 'calc(100vh - 48px)' }}>
+      <div className={`fixed bottom-6 right-6 w-full max-w-sm sm:w-[350px] bg-white transition-colors rounded-[20px] shadow-2xl border border-[#E4E7EC] flex flex-col z-50 overflow-hidden transition-all duration-300 origin-bottom-right print:hidden ${isOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0 pointer-events-none'}`} style={{ height: '500px', maxHeight: 'calc(100vh - 48px)' }}>
         {/* Header */}
         <div className="bg-[#8F2438] px-4 py-3 flex items-center justify-between text-white shrink-0">
           <div className="flex items-center gap-3">
