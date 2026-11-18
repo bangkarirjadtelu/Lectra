@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { LaporanService, type LaporanDosenRow, type LaporanTrenRow } from '../services/laporanService';
+import { LaporanService, type LaporanDosenRow } from '../services/laporanService';
 import { exportLaporanExcel } from '../utils/exportLaporan';
 import { getDynamicYearOptions, formatRupiah } from '../data/mockData';
 import {
@@ -10,14 +10,6 @@ import {
   CHART_COLOR_CAPEX,
   COLOR_TEXT_SECONDARY,
   COLOR_BORDER,
-  COLOR_BG,
-  COLOR_SUCCESS,
-  COLOR_SUCCESS_SOFT,
-  COLOR_WARNING,
-  COLOR_WARNING_SOFT,
-  COLOR_DANGER,
-  COLOR_DANGER_SOFT,
-  COLOR_PRIMARY_SOFT,
 } from '../lib/designTokens';
 
 const FAKULTAS_OPTIONS = [
@@ -26,24 +18,23 @@ const FAKULTAS_OPTIONS = [
 
 type Jenis = 'SEMUA' | 'OPEX' | 'CAPEX';
 
-function SerapanBadge({ persen }: { persen: number }) {
-  let bg = COLOR_SUCCESS_SOFT, color = COLOR_SUCCESS;
-  if (persen > 100) { bg = COLOR_DANGER_SOFT; color = COLOR_DANGER; }
-  else if (persen >= 80) { bg = COLOR_WARNING_SOFT; color = COLOR_WARNING; }
-  return (
-    <span
-      style={{ background: bg, color, fontSize: 11, fontWeight: 600, borderRadius: 6, padding: '2px 8px', display: 'inline-block' }}
-    >
-      {persen.toFixed(1)}%
-    </span>
-  );
-}
-
-function SummaryCard({ label, value, sub }: { label: string; value: number; sub?: string }) {
+function SummaryCard({
+  label,
+  value,
+  sub,
+  isCurrency = true,
+}: {
+  label: string;
+  value: number;
+  sub?: string;
+  isCurrency?: boolean;
+}) {
   return (
     <div className="bg-white rounded-[16px] border border-[#E4E7EC] shadow-sm p-4 flex flex-col gap-0.5">
       <p className="text-xs text-[#667085] font-medium">{label}</p>
-      <p className="text-base font-bold text-[#1F2937] leading-snug">{formatRupiah(value)}</p>
+      <p className="text-base font-bold text-[#1F2937] leading-snug">
+        {isCurrency ? formatRupiah(value) : `${value} Dosen`}
+      </p>
       {sub && <p className="text-xs text-[#98A2B3]">{sub}</p>}
     </div>
   );
@@ -53,10 +44,10 @@ function CustomTooltipChart({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-white border border-[#E4E7EC] rounded-[12px] shadow-lg px-4 py-3 text-sm">
-      <p className="font-semibold text-[#1F2937] mb-1">{label}</p>
+      <p className="font-semibold text-[#1F2937] mb-1">Tahun {label}</p>
       {payload.map((p: any) => (
-        <p key={p.name} style={{ color: p.color }}>
-          {p.name}: {formatRupiah(p.value)}
+        <p key={p.name} style={{ color: p.color }} className="font-medium text-xs">
+          {p.name}: <span className="font-bold">{p.value}</span> Dosen
         </p>
       ))}
     </div>
@@ -75,7 +66,6 @@ export function LaporanPage() {
 
   // Data state
   const [rows, setRows] = useState<LaporanDosenRow[]>([]);
-  const [trenRows, setTrenRows] = useState<LaporanTrenRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,12 +88,8 @@ export function LaporanPage() {
     setError(null);
     setSearch('');
     try {
-      const [dosenRows, tren] = await Promise.all([
-        LaporanService.getDosenRows(tahunDari, tahunSampai, jenis, fakultas),
-        LaporanService.getTrenData(tahunDari, tahunSampai, fakultas),
-      ]);
+      const dosenRows = await LaporanService.getDosenRows(tahunDari, tahunSampai, jenis, fakultas);
       setRows(dosenRows);
-      setTrenRows(tren);
       setAppliedFilter({ fakultas, tahunDari, tahunSampai, jenis });
       setHasFetched(true);
     } catch (e: any) {
@@ -131,9 +117,10 @@ export function LaporanPage() {
     });
   }, [rows, search, sortTahun]);
 
+  const totalDosenUnik = useMemo(() => new Set(rows.map((r) => r.dosenId)).size, [rows]);
+
   const summary = useMemo(() => ({
-    totalAnggaran: rows.reduce((s, r) => s + r.totalAnggaran, 0),
-    totalRealisasi: rows.reduce((s, r) => s + r.totalRealisasi, 0),
+    totalAnggaran: rows.reduce((s, r) => s + r.opexAnggaran + r.capexAnggaran, 0),
     totalOpex: rows.reduce((s, r) => s + r.opexAnggaran, 0),
     totalCapex: rows.reduce((s, r) => s + r.capexAnggaran, 0),
   }), [rows]);
@@ -141,15 +128,39 @@ export function LaporanPage() {
   const totals = useMemo(() => ({
     opexAnggaran: filteredRows.reduce((s, r) => s + r.opexAnggaran, 0),
     capexAnggaran: filteredRows.reduce((s, r) => s + r.capexAnggaran, 0),
-    totalAnggaran: filteredRows.reduce((s, r) => s + r.totalAnggaran, 0),
-    totalRealisasi: filteredRows.reduce((s, r) => s + r.totalRealisasi, 0),
   }), [filteredRows]);
+
+  // Chart: jumlah dosen per tahun yang mendapat OPEX/CAPEX
+  const chartData = useMemo(() => {
+    const byTahun = new Map<number, { tahun: number; opexDosen: number; capexDosen: number }>();
+
+    // Inisialisasi semua tahun dalam rentang agar grafik kontinyu
+    const minYear = Math.min(appliedFilter.tahunDari, appliedFilter.tahunSampai);
+    const maxYear = Math.max(appliedFilter.tahunDari, appliedFilter.tahunSampai);
+    for (let y = minYear; y <= maxYear; y++) {
+      byTahun.set(y, { tahun: y, opexDosen: 0, capexDosen: 0 });
+    }
+
+    for (const r of rows) {
+      if (!byTahun.has(r.tahun)) {
+        byTahun.set(r.tahun, { tahun: r.tahun, opexDosen: 0, capexDosen: 0 });
+      }
+      const entry = byTahun.get(r.tahun)!;
+      if (r.opexAnggaran > 0) entry.opexDosen++;
+      if (r.capexAnggaran > 0) entry.capexDosen++;
+    }
+
+    return Array.from(byTahun.values()).sort((a, b) => a.tahun - b.tahun);
+  }, [rows, appliedFilter.tahunDari, appliedFilter.tahunSampai]);
 
   const handleExportExcel = async () => {
     try {
       await exportLaporanExcel(
-        rows, trenRows, appliedFilter.jenis, appliedFilter.fakultas,
-        appliedFilter.tahunDari, appliedFilter.tahunSampai
+        rows,
+        appliedFilter.jenis,
+        appliedFilter.fakultas,
+        appliedFilter.tahunDari,
+        appliedFilter.tahunSampai
       );
     } catch (e: any) {
       alert('Gagal export Excel: ' + (e?.message ?? e));
@@ -304,55 +315,58 @@ export function LaporanPage() {
           <>
             {/* Summary Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-              <SummaryCard label="Total Anggaran" value={summary.totalAnggaran} />
-              <SummaryCard label="Total Realisasi" value={summary.totalRealisasi}
-                sub={summary.totalAnggaran > 0 ? `Serapan ${((summary.totalRealisasi / summary.totalAnggaran) * 100).toFixed(1)}%` : undefined}
+              <SummaryCard
+                label="Total Dosen Penerima"
+                value={totalDosenUnik}
+                isCurrency={false}
+                sub={`${rows.length} alokasi anggaran`}
               />
+              <SummaryCard label="Total Anggaran" value={summary.totalAnggaran} />
               <SummaryCard label="Total OPEX" value={summary.totalOpex} />
               <SummaryCard label="Total CAPEX" value={summary.totalCapex} />
             </div>
 
-            {/* Chart */}
-            {trenRows.length > 0 && (
+            {/* Chart: Jumlah Dosen Penerima per Tahun */}
+            {chartData.length > 0 && (
               <div className="bg-white rounded-[16px] border border-[#E4E7EC] shadow-sm p-4 mb-4 print:mb-3">
-                <h2 className="text-sm font-semibold text-[#1F2937] mb-0.5">
-                  Tren Realisasi per Tahun — {fkLabel}
-                </h2>
-                <p className="text-xs text-[#98A2B3] mb-3">OPEX & CAPEX Realisasi ({tahunLabel})</p>
-                <ResponsiveContainer width="100%" height={220}>
-                  <LineChart data={trenRows} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                <div className="mb-3">
+                  <h2 className="text-sm font-semibold text-[#1F2937]">
+                    Jumlah Dosen Penerima Anggaran per Tahun — {fkLabel}
+                  </h2>
+                  <p className="text-xs text-[#98A2B3] mt-0.5">
+                    Perbandingan jumlah dosen penerima OPEX vs CAPEX ({tahunLabel})
+                  </p>
+                </div>
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={chartData} margin={{ top: 10, right: 20, left: -10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={COLOR_BORDER} />
                     <XAxis dataKey="tahun" tick={{ fontSize: 11, fill: COLOR_TEXT_SECONDARY }} />
                     <YAxis
-                      tickFormatter={(v) => `Rp ${(v / 1_000_000).toFixed(0)}jt`}
+                      allowDecimals={false}
                       tick={{ fontSize: 10, fill: COLOR_TEXT_SECONDARY }}
-                      width={72}
+                      width={36}
                     />
                     <Tooltip content={<CustomTooltipChart />} />
-                    <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11 }} />
+                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
                     {appliedFilter.jenis !== 'CAPEX' && (
-                      <Line
-                        type="monotone"
-                        dataKey="opexRealisasi"
-                        name="OPEX Realisasi"
-                        stroke={COLOR_PRIMARY}
-                        strokeWidth={2}
-                        dot={{ r: 3, fill: COLOR_PRIMARY }}
-                        activeDot={{ r: 5 }}
+                      <Bar
+                        dataKey="opexDosen"
+                        name="Dosen OPEX"
+                        fill={COLOR_PRIMARY}
+                        radius={[4, 4, 0, 0]}
+                        maxBarSize={44}
                       />
                     )}
                     {appliedFilter.jenis !== 'OPEX' && (
-                      <Line
-                        type="monotone"
-                        dataKey="capexRealisasi"
-                        name="CAPEX Realisasi"
-                        stroke={CHART_COLOR_CAPEX}
-                        strokeWidth={2}
-                        dot={{ r: 3, fill: CHART_COLOR_CAPEX }}
-                        activeDot={{ r: 5 }}
+                      <Bar
+                        dataKey="capexDosen"
+                        name="Dosen CAPEX"
+                        fill={CHART_COLOR_CAPEX}
+                        radius={[4, 4, 0, 0]}
+                        maxBarSize={44}
                       />
                     )}
-                  </LineChart>
+                  </BarChart>
                 </ResponsiveContainer>
               </div>
             )}
@@ -428,43 +442,32 @@ export function LaporanPage() {
                         </th>
                         {showOpexCol && <th className="px-3 py-2.5 text-right font-semibold">OPEX Anggaran</th>}
                         {showCapexCol && <th className="px-3 py-2.5 text-right font-semibold">CAPEX Anggaran</th>}
-                        <th className="px-3 py-2.5 text-right font-semibold">Total Anggaran</th>
-                        <th className="px-3 py-2.5 text-right font-semibold">Total Realisasi</th>
-                        <th className="px-3 py-2.5 text-center font-semibold">Serapan</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredRows.map((r, idx) => {
-                        const serapan = r.totalAnggaran > 0 ? (r.totalRealisasi / r.totalAnggaran) * 100 : 0;
-                        return (
-                          <tr
-                            key={`${r.dosenId}-${r.tahun}`}
-                            className={`border-t border-[#EAECF0] ${idx % 2 === 1 ? 'bg-[#F9FAFB]' : 'bg-white'} hover:bg-[#F8E9ED]/40 transition-colors`}
-                          >
-                            <td className="px-3 py-2 text-[#98A2B3] text-center">{idx + 1}</td>
-                            <td className="px-3 py-2 font-medium text-[#1F2937]">{r.nama}</td>
-                            <td className="px-3 py-2 text-[#667085] font-mono">{r.nip}</td>
-                            <td className="px-3 py-2">
-                              <span className="inline-block px-1.5 py-0.5 rounded-[5px] text-xs font-semibold bg-[#F8E9ED] text-[#8F2438]">
-                                {r.fakultas}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2 text-[#667085]">{r.programStudi}</td>
-                            <td className="px-3 py-2 text-center">
-                              <span className="inline-block px-2 py-0.5 rounded-[5px] text-xs font-semibold bg-[#E8F5EF] text-[#16805B]">
-                                {r.tahun}
-                              </span>
-                            </td>
-                            {showOpexCol && <td className="px-3 py-2 text-right text-[#1F2937]">{formatRupiah(r.opexAnggaran)}</td>}
-                            {showCapexCol && <td className="px-3 py-2 text-right text-[#1F2937]">{formatRupiah(r.capexAnggaran)}</td>}
-                            <td className="px-3 py-2 text-right font-medium text-[#1F2937]">{formatRupiah(r.totalAnggaran)}</td>
-                            <td className="px-3 py-2 text-right font-medium text-[#1F2937]">{formatRupiah(r.totalRealisasi)}</td>
-                            <td className="px-3 py-2 text-center">
-                              <SerapanBadge persen={serapan} />
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {filteredRows.map((r, idx) => (
+                        <tr
+                          key={`${r.dosenId}-${r.tahun}`}
+                          className={`border-t border-[#EAECF0] ${idx % 2 === 1 ? 'bg-[#F9FAFB]' : 'bg-white'} hover:bg-[#F8E9ED]/40 transition-colors`}
+                        >
+                          <td className="px-3 py-2 text-[#98A2B3] text-center">{idx + 1}</td>
+                          <td className="px-3 py-2 font-medium text-[#1F2937]">{r.nama}</td>
+                          <td className="px-3 py-2 text-[#667085] font-mono">{r.nip}</td>
+                          <td className="px-3 py-2">
+                            <span className="inline-block px-1.5 py-0.5 rounded-[5px] text-xs font-semibold bg-[#F8E9ED] text-[#8F2438]">
+                              {r.fakultas}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-[#667085]">{r.programStudi}</td>
+                          <td className="px-3 py-2 text-center">
+                            <span className="inline-block px-2 py-0.5 rounded-[5px] text-xs font-semibold bg-[#E8F5EF] text-[#16805B]">
+                              {r.tahun}
+                            </span>
+                          </td>
+                          {showOpexCol && <td className="px-3 py-2 text-right text-[#1F2937]">{formatRupiah(r.opexAnggaran)}</td>}
+                          {showCapexCol && <td className="px-3 py-2 text-right text-[#1F2937]">{formatRupiah(r.capexAnggaran)}</td>}
+                        </tr>
+                      ))}
                     </tbody>
                     <tfoot>
                       <tr className="bg-[#F8E9ED] border-t-2 border-[#8F2438]">
@@ -477,11 +480,6 @@ export function LaporanPage() {
                         {showCapexCol && (
                           <td className="px-3 py-2.5 text-right font-bold text-[#1F2937]">{formatRupiah(totals.capexAnggaran)}</td>
                         )}
-                        <td className="px-3 py-2.5 text-right font-bold text-[#1F2937]">{formatRupiah(totals.totalAnggaran)}</td>
-                        <td className="px-3 py-2.5 text-right font-bold text-[#1F2937]">{formatRupiah(totals.totalRealisasi)}</td>
-                        <td className="px-3 py-2.5 text-center">
-                          <SerapanBadge persen={totals.totalAnggaran > 0 ? (totals.totalRealisasi / totals.totalAnggaran) * 100 : 0} />
-                        </td>
                       </tr>
                     </tfoot>
                   </table>

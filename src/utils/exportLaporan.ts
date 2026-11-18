@@ -1,4 +1,4 @@
-import type { LaporanDosenRow, LaporanTrenRow } from '../services/laporanService';
+import type { LaporanDosenRow } from '../services/laporanService';
 
 const MAROON = 'FF8F2438';
 const LIGHT_ROW = 'FFF9FAFB';
@@ -30,7 +30,6 @@ function totalStyle(isRp = false) {
 
 export async function exportLaporanExcel(
   rows: LaporanDosenRow[],
-  trenRows: LaporanTrenRow[],
   jenis: 'SEMUA' | 'OPEX' | 'CAPEX',
   fakultas: string,
   tahunDari: number,
@@ -48,18 +47,6 @@ export async function exportLaporanExcel(
   // ---- Sheet 1: Per Dosen ----
   const ws1 = wb.addWorksheet('Per Dosen');
 
-  // Title rows
-  ws1.mergeCells('A1:J1');
-  ws1.getCell('A1').value = `LAPORAN ANGGARAN DOSEN — ${fkLabel.toUpperCase()} (${tahunLabel})`;
-  ws1.getCell('A1').font = { bold: true, size: 12, color: { argb: MAROON } };
-  ws1.getCell('A1').alignment = { horizontal: 'center' };
-
-  ws1.mergeCells('A2:J2');
-  ws1.getCell('A2').value = `Jenis: ${jenis}  |  Dicetak: ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}`;
-  ws1.getCell('A2').alignment = { horizontal: 'center' };
-  ws1.getCell('A2').font = { size: 9, color: { argb: 'FF667085' } };
-  ws1.getRow(3).height = 6;
-
   // Build columns
   const cols: { header: string; key: string; width: number }[] = [
     { header: 'No', key: 'no', width: 5 },
@@ -71,15 +58,26 @@ export async function exportLaporanExcel(
   ];
   if (jenis !== 'CAPEX') cols.push({ header: 'OPEX Anggaran', key: 'opexAnggaran', width: 18 });
   if (jenis !== 'OPEX') cols.push({ header: 'CAPEX Anggaran', key: 'capexAnggaran', width: 18 });
-  cols.push({ header: 'Total Anggaran', key: 'totalAnggaran', width: 18 });
-  cols.push({ header: 'Total Realisasi', key: 'totalRealisasi', width: 18 });
-  cols.push({ header: 'Serapan (%)', key: 'serapan', width: 13 });
 
   ws1.columns = cols;
 
+  const lastColLetter = String.fromCharCode(65 + cols.length - 1);
+
+  // Title rows
+  ws1.mergeCells(`A1:${lastColLetter}1`);
+  ws1.getCell('A1').value = `LAPORAN ANGGARAN DOSEN — ${fkLabel.toUpperCase()} (${tahunLabel})`;
+  ws1.getCell('A1').font = { bold: true, size: 12, color: { argb: MAROON } };
+  ws1.getCell('A1').alignment = { horizontal: 'center' };
+
+  ws1.mergeCells(`A2:${lastColLetter}2`);
+  ws1.getCell('A2').value = `Jenis: ${jenis}  |  Dicetak: ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}`;
+  ws1.getCell('A2').alignment = { horizontal: 'center' };
+  ws1.getCell('A2').font = { size: 9, color: { argb: 'FF667085' } };
+  ws1.getRow(3).height = 6;
+
   // Header row (row 4)
   const headerRow = ws1.getRow(4);
-  headerRow.height = 32;
+  headerRow.height = 30;
   cols.forEach((c, i) => {
     const cell = headerRow.getCell(i + 1);
     cell.value = c.header;
@@ -87,12 +85,9 @@ export async function exportLaporanExcel(
     Object.assign(cell.style, headerStyle());
   });
 
-  const rpKeys = new Set(['opexAnggaran', 'capexAnggaran', 'totalAnggaran', 'totalRealisasi']);
+  const rpKeys = new Set(['opexAnggaran', 'capexAnggaran']);
 
   rows.forEach((r, idx) => {
-    const serapan =
-      r.totalAnggaran > 0 ? +(((r.totalRealisasi / r.totalAnggaran) * 100).toFixed(1)) : 0;
-
     const rowData: Record<string, any> = {
       no: idx + 1,
       nama: r.nama,
@@ -102,9 +97,6 @@ export async function exportLaporanExcel(
       tahun: r.tahun,
       opexAnggaran: r.opexAnggaran,
       capexAnggaran: r.capexAnggaran,
-      totalAnggaran: r.totalAnggaran,
-      totalRealisasi: r.totalRealisasi,
-      serapan: serapan / 100,
     };
 
     const exRow = ws1.addRow(cols.map((c) => rowData[c.key]));
@@ -121,10 +113,6 @@ export async function exportLaporanExcel(
     cols.forEach((c, ci) => {
       const cell = exRow.getCell(ci + 1);
       if (rpKeys.has(c.key)) Object.assign(cell.style, rpStyle());
-      if (c.key === 'serapan') {
-        cell.numFmt = '0.0%';
-        cell.alignment = { horizontal: 'center' };
-      }
       if (c.key === 'no' || c.key === 'tahun') cell.alignment = { horizontal: 'center' };
     });
   });
@@ -139,9 +127,6 @@ export async function exportLaporanExcel(
     tahun: '',
     opexAnggaran: rows.reduce((s, r) => s + r.opexAnggaran, 0),
     capexAnggaran: rows.reduce((s, r) => s + r.capexAnggaran, 0),
-    totalAnggaran: rows.reduce((s, r) => s + r.totalAnggaran, 0),
-    totalRealisasi: rows.reduce((s, r) => s + r.totalRealisasi, 0),
-    serapan: '',
   };
 
   const totalRow = ws1.addRow(cols.map((c) => totals[c.key]));
@@ -152,23 +137,23 @@ export async function exportLaporanExcel(
     else Object.assign(cell.style, totalStyle());
   });
 
-  // ---- Sheet 2: Tren per Tahun ----
-  const ws2 = wb.addWorksheet('Tren per Tahun');
+  // ---- Sheet 2: Rekap per Tahun ----
+  const ws2 = wb.addWorksheet('Rekap per Tahun');
 
   ws2.mergeCells('A1:G1');
-  ws2.getCell('A1').value = `TREN ANGGARAN PER TAHUN — ${fkLabel.toUpperCase()} (${tahunLabel})`;
+  ws2.getCell('A1').value = `REKAP JUMLAH DOSEN & ANGGARAN PER TAHUN — ${fkLabel.toUpperCase()} (${tahunLabel})`;
   ws2.getCell('A1').font = { bold: true, size: 12, color: { argb: MAROON } };
   ws2.getCell('A1').alignment = { horizontal: 'center' };
   ws2.getRow(2).height = 6;
 
   const cols2 = [
-    { header: 'Tahun', key: 'tahun', width: 8 },
-    { header: 'OPEX Anggaran', key: 'opexAnggaran', width: 18 },
-    { header: 'OPEX Realisasi', key: 'opexRealisasi', width: 18 },
-    { header: 'CAPEX Anggaran', key: 'capexAnggaran', width: 18 },
-    { header: 'CAPEX Realisasi', key: 'capexRealisasi', width: 18 },
-    { header: 'Total Anggaran', key: 'totalAnggaran', width: 18 },
-    { header: 'Total Realisasi', key: 'totalRealisasi', width: 18 },
+    { header: 'Tahun', key: 'tahun', width: 10 },
+    { header: 'Dosen OPEX', key: 'opexDosen', width: 14 },
+    { header: 'Dosen CAPEX', key: 'capexDosen', width: 14 },
+    { header: 'Total Dosen', key: 'totalDosen', width: 14 },
+    { header: 'Total OPEX (Rp)', key: 'totalOpex', width: 20 },
+    { header: 'Total CAPEX (Rp)', key: 'totalCapex', width: 20 },
+    { header: 'Total Anggaran (Rp)', key: 'totalAnggaran', width: 22 },
   ];
 
   ws2.columns = cols2;
@@ -181,15 +166,67 @@ export async function exportLaporanExcel(
     Object.assign(cell.style, headerStyle());
   });
 
-  trenRows.forEach((t, idx) => {
+  // Aggregate per year from rows
+  const byTahun = new Map<
+    number,
+    {
+      tahun: number;
+      opexDosen: Set<string>;
+      capexDosen: Set<string>;
+      allDosen: Set<string>;
+      totalOpex: number;
+      totalCapex: number;
+    }
+  >();
+
+  const minYear = Math.min(tahunDari, tahunSampai);
+  const maxYear = Math.max(tahunDari, tahunSampai);
+  for (let y = minYear; y <= maxYear; y++) {
+    byTahun.set(y, {
+      tahun: y,
+      opexDosen: new Set(),
+      capexDosen: new Set(),
+      allDosen: new Set(),
+      totalOpex: 0,
+      totalCapex: 0,
+    });
+  }
+
+  for (const r of rows) {
+    if (!byTahun.has(r.tahun)) {
+      byTahun.set(r.tahun, {
+        tahun: r.tahun,
+        opexDosen: new Set(),
+        capexDosen: new Set(),
+        allDosen: new Set(),
+        totalOpex: 0,
+        totalCapex: 0,
+      });
+    }
+    const entry = byTahun.get(r.tahun)!;
+    if (r.opexAnggaran > 0) {
+      entry.opexDosen.add(r.dosenId);
+      entry.allDosen.add(r.dosenId);
+      entry.totalOpex += r.opexAnggaran;
+    }
+    if (r.capexAnggaran > 0) {
+      entry.capexDosen.add(r.dosenId);
+      entry.allDosen.add(r.dosenId);
+      entry.totalCapex += r.capexAnggaran;
+    }
+  }
+
+  const sortedYears = Array.from(byTahun.values()).sort((a, b) => a.tahun - b.tahun);
+
+  sortedYears.forEach((t, idx) => {
     const exRow = ws2.addRow([
       t.tahun,
-      t.opexAnggaran,
-      t.opexRealisasi,
-      t.capexAnggaran,
-      t.capexRealisasi,
-      t.totalAnggaran,
-      t.totalRealisasi,
+      t.opexDosen.size,
+      t.capexDosen.size,
+      t.allDosen.size,
+      t.totalOpex,
+      t.totalCapex,
+      t.totalOpex + t.totalCapex,
     ]);
     exRow.height = 18;
 
@@ -201,8 +238,11 @@ export async function exportLaporanExcel(
 
     cols2.forEach((c, ci) => {
       const cell = exRow.getCell(ci + 1);
-      if (c.key !== 'tahun') Object.assign(cell.style, rpStyle());
-      else cell.alignment = { horizontal: 'center' };
+      if (['totalOpex', 'totalCapex', 'totalAnggaran'].includes(c.key)) {
+        Object.assign(cell.style, rpStyle());
+      } else {
+        cell.alignment = { horizontal: 'center' };
+      }
     });
   });
 
